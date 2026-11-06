@@ -4,3 +4,5 @@ scikit-learn
 torch
 rdkit
 pillow
+xgboost
+matplotlib
