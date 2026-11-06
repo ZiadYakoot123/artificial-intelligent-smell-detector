@@ -3,3 +3,4 @@ pandas
 scikit-learn
 torch
 rdkit
+pillow

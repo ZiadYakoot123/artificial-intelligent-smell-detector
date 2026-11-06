@@ -100,6 +100,22 @@ python cnn_smell_detector.py \
 
 The output is JSON containing smell names and probabilities. Labels passing the saved per-smell thresholds are returned first. If none pass, the command returns the highest-ranked labels so every valid molecule receives a useful result.
 
+## Generate Labeled Dataset Images
+
+Create a PNG for every valid molecule and a metadata file containing the complete labels:
+
+```bash
+python generate_dataset_images.py
+```
+
+Images are written to `generated_images/`. Each PNG contains the three signal channels as RGB and a text panel listing its active smells. The accompanying `generated_images/metadata.csv` maps each filename to its SMILES, descriptor text, and semicolon-separated labels. Use `--limit` to preview a smaller set:
+
+```bash
+python generate_dataset_images.py --limit 25
+```
+
+The PNG files are ignored by Git because the full dataset export is large; regenerate them from the CSV whenever needed.
+
 ## Reproducibility
 
 The seed controls Python, NumPy, and PyTorch random generators. The split seed, image dimensions, CNN architecture, optimizer, class-weight cap, and thresholds are stored or exposed in the training script. Results can still vary slightly between CPU and GPU backends.
