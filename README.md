@@ -1,125 +1,113 @@
-# Artificial Intelligent Smell Detector
+# CNN Smell Detector
 
-This repository contains an artificial intelligent smell detector based on OpenPOM.
+This project trains a small convolutional neural network (CNN) to predict human odor descriptors from molecular SMILES strings. It is a multi-label task: one molecule can have several smell labels at the same time.
 
-## Open Principal Odor Map
-Replication of the Principal Odor Map paper by Brian K. Lee et al. (2023) \[1\].
-The model is implemented such that it integrates with [DeepChem](https://github.com/deepchem/deepchem ).
+## Project Contents
 
-## Benchmarks
-| Model    | Data      | Type  | ROC-AUC Score |
-| :------------: |   :---:       |   :---:       | :--------: |
-| [MPNNPOMModel](https://github.com/ARY2260/openpom/blob/74e964eb5b1086badcb3e3ba47df3528259d7000/openpom/models/mpnn_pom.py)        |  [curated_GS_LF_merged_4983.csv](https://github.com/ARY2260/openpom/blob/74e964eb5b1086badcb3e3ba47df3528259d7000/openpom/data/curated_datasets/curated_GS_LF_merged_4983.csv)       | 5-Fold CV with ensemble of 10 models per fold   | 0.8872
+- `cnn_smell_detector.py`: data loading, molecular signal-to-image conversion, CNN, training, evaluation, and inference.
+- `smell_cnn.pt`: trained checkpoint with model weights, smell names, and precision-oriented thresholds.
+- `requirements.txt`: runtime dependencies.
+- `openpom/data/curated_datasets/curated_GS_LF_merged_4983.csv`: default training dataset.
+- `openpom/data/curated_datasets/`: additional preserved CSV datasets.
 
-## Installation (Python 3.10)
-### PyPI based installation
-1. Install latest Deepchem (nightly) version:
+The previous DeepChem/DGL implementation and unavailable Git LFS checkpoints were removed. All CSV data files were preserved.
 
-```bash
-pip install --pre deepchem
-```
+## Dataset Format
 
-2. Install torch v2.4.0 - CUDA 12.4 and dgl (for respective torch version)
+The default CSV has 4,983 molecules and 138 smell labels. Its columns are:
 
-```bash
-pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu124
+1. `nonStereoSMILES`: molecular structure encoded as SMILES.
+2. `descriptors`: human-readable odor descriptors separated by semicolons.
+3. 138 binary smell columns such as `fruity`, `green`, `sweet`, and `woody`.
 
-pip install dgl -f https://data.dgl.ai/wheels/torch-2.4/cu124/repo.html
-```
+Rows with invalid SMILES are skipped. The label columns are read from the CSV header, so the script does not hard-code the smell vocabulary.
 
-3. Install openpom
+## Signal-to-Image Encoding
 
-```bash
-pip install openpom
-```
+Each molecule is converted deterministically to a `3 x 64 x 64` floating-point image:
 
-### Github fork based installation
-1. Fork the [OpenPOM](https://github.com/ARY2260/openpom) repository
-and clone the forked repository
+- Channel 0 stores the symmetric bond-order adjacency matrix.
+- Channel 1 stores atom atomic-number and degree signals on the diagonal and neighboring positions.
+- Channel 2 stores a 4,096-bit Morgan fingerprint reshaped to `64 x 64`.
 
-```bash
-git clone https://github.com/YOUR-USERNAME/openpom.git
-cd openpom
-```
+This representation combines local molecular topology with a fixed-length chemical fingerprint. The same SMILES always generates the same tensor, and no molecule image is loaded from an external source.
 
-2. Setup conda environment
-```bash
-conda create -n open_pom python=3.10
-conda activate open_pom
-```
+## Installation
 
-3. Install required dependencies and openpom
+Use Python 3.10 or newer:
 
 ```bash
-pip install --pre deepchem
-pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu124
-pip install dgl -f https://data.dgl.ai/wheels/torch-2.4/cu124/repo.html
-pip install pyrfume dgllife pytest ipykernel scikit-multilearn
-pip install .
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
-## Getting started
-Example notebooks for model training and finetuning are available [here](https://github.com/ARY2260/openpom/tree/main/examples).
+For a CPU-only PyTorch installation, install the CPU wheel according to the official PyTorch instructions before installing the remaining requirements.
 
-### Odor Prediction Demo: `predict_odors.py`
-<img width="600" height="400" alt="image" src="https://github.com/user-attachments/assets/bd224afb-841a-4910-84cb-08528c1043bf" />
+## Train and Evaluate
 
-A ready-to-use demo GUI for predicting odor qualities from molecular SMILES strings is provided in [`predict_odors.py`](./predict_odors.py).
-This Python script allows you to enter a SMILES string and obtain model-based odor predictions, visualized as a barplot of the top-N scoring odor terms.
+Run the default 15-epoch experiment:
 
-#### Features
-
-- **Ensemble MPNN Models:** Uses a openpom 10-model ensemble trained on the Principal Odor Map (POM) dataset.
-- **Graphical User Interface:** Enter SMILES, select the number of top odors to display, and visualize results interactively.
-- **RDKit-based Structure Rendering:** Shows the molecular structure (if RDKit is installed).
-- **One-click Results Export:** Copy top-N predictions as TXT or JSON for downstream analysis.
-
-#### Running the Demo
-
-Assuming you have installed the required dependencies and downloaded or trained the ensemble models to `./models/ensemble_models`, launch the GUI with:
 ```bash
-python predict_odors.py
+python cnn_smell_detector.py --epochs 15 --batch-size 64
 ```
-The default window will prompt you to input a SMILES string. Press **Predict Odors** to view results.
 
-- The left side of the interface displays the input entry and buttons.
-- The right side shows the predicted odor probabilities as a bar chart for the top N terms.
-- Results can be easily copied as text or JSON for practical use.
+This performs a deterministic 70/10/20 train/validation/test split using seed `7`, trains the CNN, prints evaluation metrics, and writes `smell_cnn.pt`.
 
-> **Note:** If you do not have GPU support (CUDA), ensure the models are set to load on CPU. You may have to edit the `device_name` parameter in the script accordingly.
+Useful options:
 
-#### Example Usage
-
-1. **Input a SMILES string:**  
-   For example, `CCO` (ethanol).
-2. **Choose Top N:**  
-   Specify how many of the highest-scoring odors to visualize.
-3. **Press "Predict Odors":**  
-   The barplot will show the predicted intensity for each top odor term.
-4. **Copy Results:**  
-   Use **Copy Results (TXT/JSON)** to export the predictions for further processing.
-
-
-## Contributors:
-**Aryan Amit Barsainyan**, National Institute of Technology Karnataka, India: code, data cleaning, model development<br/>
-**Ritesh Kumar**, CSIR-CSIO, Chandigarh, India: data cleaning, hyperparameter optimisation<br/>
-**Pinaki Saha**, University of Hertfordshire, UK: discussions and feedback<br/>
-**Michael Schmuker**, University of Hertfordshire, UK: conceptualisation, project lead<br/>
-
-## References:
-\[1\] A Principal Odor Map Unifies Diverse Tasks in Human Olfactory Perception.<br/>
-
-Brian K. Lee, Emily J. Mayhew, Benjamin Sanchez-Lengeling, Jennifer N. Wei, Wesley W. Qian, Kelsie A. Little, Matthew Andres, Britney B. Nguyen, Theresa Moloy, Jacob Yasonik, Jane K. Parker, Richard C. Gerkin, Joel D. Mainland, Alexander B. Wiltschko<br/>
-
-Science381,999-1006(2023).DOI: [10.1126/science.ade4401](https://doi.org/10.1126/science.ade4401) <br/>
-bioRxiv 2022.09.01.504602; doi: [https://doi.org/10.1101/2022.09.01.504602](https://doi.org/10.1101/2022.09.01.504602)
-
-## Citing OpenPOM:
+```bash
+python cnn_smell_detector.py --csv path/to/data.csv --epochs 30
+python cnn_smell_detector.py --epochs 1
+python cnn_smell_detector.py --min-threshold 0.5
 ```
-@misc{OpenPOM,
-  author={Aryan Amit Barsainyan and Ritesh Kumar and Pinaki Saha and Michael Schmuker},
-  title={OpenPOM - Open Principal Odor Map},
-  year={2023},
-  note={\url{https://github.com/BioMachineLearning/openpom}},
-}
+
+The model uses square-root capped positive-class weights to reduce the effect of very rare smells. Per-label thresholds are tuned on validation data and have a default minimum of `0.7` because precision is the current priority.
+
+## Evaluation
+
+The test metrics include:
+
+- Micro and macro ROC-AUC for ranking quality.
+- Micro and macro average precision for imbalanced labels.
+- Micro and macro binary precision after thresholding.
+- Micro recall after thresholding.
+- Precision@1, Precision@3, and Precision@5 for ranked smell suggestions.
+
+The latest CPU run produced:
+
+| Metric | Value |
+| --- | ---: |
+| Micro ROC-AUC | 0.8948 |
+| Macro ROC-AUC | 0.8411 |
+| Micro average precision | 0.3517 |
+| Micro precision at threshold 0.7 | 0.6127 |
+| Micro recall at threshold 0.7 | 0.1559 |
+| Precision@1 | 0.5888 |
+
+Precision and recall are intentionally not treated as interchangeable. Raising the threshold increases precision but reduces the number of returned smells.
+
+## Predict a Known Molecule
+
+Use the trained checkpoint to predict one SMILES string:
+
+```bash
+python cnn_smell_detector.py \
+  --predict-smiles "CCO" \
+  --output smell_cnn.pt \
+  --top-count 10
 ```
+
+The output is JSON containing smell names and probabilities. Labels passing the saved per-smell thresholds are returned first. If none pass, the command returns the highest-ranked labels so every valid molecule receives a useful result.
+
+## Reproducibility
+
+The seed controls Python, NumPy, and PyTorch random generators. The split seed, image dimensions, CNN architecture, optimizer, class-weight cap, and thresholds are stored or exposed in the training script. Results can still vary slightly between CPU and GPU backends.
+
+## Limitations
+
+- Odor perception is subjective and the labels are noisy.
+- A random molecule split can contain chemically similar structures in both train and test sets.
+- Rare smell classes have limited test examples, so macro metrics can be unstable.
+- The image encoding is a fixed experiment, not a chemically complete representation.
+- A high ROC-AUC does not guarantee high precision at the selected operating threshold.

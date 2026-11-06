@@ -1,5 +1,5 @@
-pyrfume
-dgllife
-pytest
-ipykernel
-scikit-multilearn
+numpy
+pandas
+scikit-learn
+torch
+rdkit
