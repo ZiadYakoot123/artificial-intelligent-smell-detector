@@ -1,4 +1,8 @@
-# Open Principal Odor Map
+# Artificial Intelligent Smell Detector
+
+This repository contains an artificial intelligent smell detector based on OpenPOM.
+
+## Open Principal Odor Map
 Replication of the Principal Odor Map paper by Brian K. Lee et al. (2023) \[1\].
 The model is implemented such that it integrates with [DeepChem](https://github.com/deepchem/deepchem ).
 
